@@ -50,6 +50,10 @@ public class Usuario {
 		comentarios = new ArrayList<Comentario>();
 	}
 
+	public void setIdUsuario(int idUsuario) {
+		this.idUsuario = idUsuario;
+	}
+
 	public String getNombre() {
 		return nombre;
 	}

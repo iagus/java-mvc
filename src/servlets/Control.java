@@ -146,11 +146,14 @@ public class Control extends HttpServlet {
 				
 				// registra el usuario, obtiene el idUsuario autoincrementado generado
 				consultasBD.registrarUsuario(consultas, usuario);
-				idUsuario = consultasBD.obtenerIdUsuario(consultas, usuario);
+				usuario = consultasBD.obtenerIdUsuario(consultas, usuario);
 				
 				// recupera los comentarios de ese usuario
-				// devuelve el mismo objeto con los comentarios incluidos en sus datos
-				usuario = consultasBD.recuperarComentariosUsuario(consultas, idUsuario, usuario);
+				// recibe mismo objeto con los comentarios incluidos en sus datos
+				usuario = consultasBD.recuperarComentariosUsuario(consultas, usuario.getIdUsuario(), usuario);
+				
+				// añade el usuario a la sesion
+				sesion.setAttribute("usuario", usuario);
 				
 				break;
 		
@@ -181,76 +184,56 @@ public class Control extends HttpServlet {
 	
 				
 		//insertar nuevo comentario
-		case 5:
-					Usuario usuario = (Usuario) sesion.getAttribute("usuario");
-					String texto = request.getParameter("comentario");
-					valoracion = Integer.parseInt(request.getParameter("valoracion"));
-					idProducto = Integer.parseInt(request.getParameter("producto"));
-					String nombreUsuario = usuario.getNombre();
-					idUsuario = Integer.parseInt(request.getParameter("usuario"));
-					Comentario comentarioParaInsertar = new Comentario(idProducto, idUsuario, texto, valoracion);
-					usuario.addComentario(comentarioParaInsertar);
+		case 5:	
+				// recupera al usuario (que es autor del comentario) y los datos
+				usuario = (Usuario) sesion.getAttribute("usuario");
+				String texto = request.getParameter("comentario");
+				valoracion = Integer.parseInt(request.getParameter("valoracion"));
+				idProducto = Integer.parseInt(request.getParameter("producto"));
+				
+				// inserta en la BD y en el modelo de datos del Usuario
+				consultasBD.insertarComentario(consultas, usuario, idProducto, valoracion, texto);
+				break; 
 					
-					// guardamos el comentario en la BD
+	//eliminar comentario
+		case 6:
+					idUsuario = Integer.parseInt(request.getParameter("usuario"));
+					idProducto = Integer.parseInt(request.getParameter("producto"));
+					usuario = (Usuario) sesion.getAttribute("usuario");
+					
 					try {
-						sentencia = con.prepareStatement("INSERT INTO reviews(idProducto, idUsuario, comentario, valoracion)"
-						+ " VALUES(?, ?, ?, ?)");
+						sentencia = con.prepareStatement("SELECT * from reviews WHERE idProducto = ? AND idUsuario = ?");
+						sentencia.setInt(1, idUsuario);
+						sentencia.setInt(2, idProducto);
+						
+						ResultSet comentariosParaEliminar = sentencia.executeQuery();
+						
+						while (comentariosParaEliminar.next())
+						{
+							idUsuario = comentariosParaEliminar.getInt("idUsuario");
+							idProducto = comentariosParaEliminar.getInt("idProducto");
+							comentario = comentariosParaEliminar.getString("comentario");
+							valoracion = comentariosParaEliminar.getInt("valoracion");
+								
+							Comentario comEliminar = new Comentario(idProducto, idUsuario, comentario, valoracion);
+							usuario.eliminarComentario(idProducto, idUsuario);
+						}
+							
+						sentencia = con.prepareStatement("DELETE from reviews WHERE idProducto = ? AND idUsuario = ?");
 						sentencia.setInt(1, idProducto);
 						sentencia.setInt(2, idUsuario);
-						sentencia.setString(3, texto);
-						sentencia.setInt(4, valoracion);
-						
 						sentencia.executeUpdate();
+						System.out.println(idUsuario);
+						System.out.println(idProducto);
 						sesion.setAttribute("usuario", usuario);
-						
-						request.getRequestDispatcher("producto.jsp?oculto=4&idP=" + idProducto).forward(request, response);
+							
+						request.getRequestDispatcher("perfil.jsp").forward(request, response);
+							
 						break;
-					} catch (SQLException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-					
-					
-				//eliminar comentario
-				case 6:
-						idUsuario = Integer.parseInt(request.getParameter("usuario"));
-						idProducto = Integer.parseInt(request.getParameter("producto"));
-						usuario = (Usuario) sesion.getAttribute("usuario");
-						
-						try {
-							sentencia = con.prepareStatement("SELECT * from reviews WHERE idProducto = ? AND idUsuario = ?");
-							sentencia.setInt(1, idUsuario);
-							sentencia.setInt(2, idProducto);
-							
-							ResultSet comentariosParaEliminar = sentencia.executeQuery();
-							
-							while (comentariosParaEliminar.next())
-							{
-								idUsuario = comentariosParaEliminar.getInt("idUsuario");
-								idProducto = comentariosParaEliminar.getInt("idProducto");
-								comentario = comentariosParaEliminar.getString("comentario");
-								valoracion = comentariosParaEliminar.getInt("valoracion");
-								
-								Comentario comEliminar = new Comentario(idProducto, idUsuario, comentario, valoracion);
-								usuario.eliminarComentario(idProducto, idUsuario);
-							}
-							
-							sentencia = con.prepareStatement("DELETE from reviews WHERE idProducto = ? AND idUsuario = ?");
-							sentencia.setInt(1, idProducto);
-							sentencia.setInt(2, idUsuario);
-							sentencia.executeUpdate();
-							System.out.println(idUsuario);
-							System.out.println(idProducto);
-							sesion.setAttribute("usuario", usuario);
-							
-							request.getRequestDispatcher("perfil.jsp").forward(request, response);
-							
-							break;
 						} catch (SQLException e1) {
 							// TODO Auto-generated catch block
 							e1.printStackTrace();
 						}
-						break;
 				
 				//loguear user
 				case 7: 

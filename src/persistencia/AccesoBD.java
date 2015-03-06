@@ -130,7 +130,7 @@ public class AccesoBD {
 	 * @param usuario
 	 * @return valor de la columna idUsuario en la BD
 	 */
-	public int obtenerIdUsuario(Properties consultas, Usuario usuario)
+	public Usuario obtenerIdUsuario(Properties consultas, Usuario usuario)
 	{
 		// extrae los valores nombre y password
 		String nombre = usuario.getNombre();
@@ -150,13 +150,15 @@ public class AccesoBD {
 				id = result.getInt("idUsuario");
 			}
 			
+			// le da al objeto usuario su id correspondiente
+			usuario.setIdUsuario(id);
 			sentenciaSQL.close();
 			
 		} catch (SQLException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		return id;
+		return usuario;
 	}
 	
 	
@@ -292,6 +294,53 @@ public class AccesoBD {
 		
 		// una vez fuera del bucle, devuelve el objeto con los comentarios actualizados
 		return p;
+	}
+	
+	
+	
+	/**
+	 * Inserta un nuevo comentario tanto en la tabla de los comentarios como
+	 * en el modelo de datos del Usuario actual de la sesion.
+	 * En la tabla se insertará el idUsuario pero en el modelo se sustituirá
+	 * por el nombre del usuario.
+	 * @param consultas
+	 * @param u
+	 * @param idProducto
+	 * @param valoracion
+	 * @param texto
+	 * @return objeto usuario con el nuevo comentario incluido en sus datos.
+	 */
+	public Usuario insertarComentario(Properties consultas, Usuario u, int idProducto, int valoracion, String texto)
+	{
+		// obtiene el id del objeto usuario 
+		u = obtenerIdUsuario(consultas, u);
+		
+		try {
+			// inserta el comentario en la BD
+			sentenciaSQL = con.prepareStatement(consultas.getProperty("insertarComentario"));
+			sentenciaSQL.setInt(1, idProducto);
+			sentenciaSQL.setInt(2, u.getIdUsuario());
+			sentenciaSQL.setString(3, texto);
+			sentenciaSQL.setInt(4, valoracion);
+			sentenciaSQL.executeUpdate();
+			
+			// inserta el comentario en el modelo de datos del Usuario
+			Comentario c = new Comentario(idProducto, u.getNombre(), texto, valoracion);
+			u.addComentario(c);
+			
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		// devuelve el objeto actualizado
+		return u;
+	}
+	
+	
+	public void eliminarComentario(Properties consultas, int idUsuario, int idProducto)
+	{
+		
 	}
 
 }
