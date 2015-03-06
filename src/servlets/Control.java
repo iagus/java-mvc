@@ -10,6 +10,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
+import persistencia.AccesoBD;
 import modelos.Carrito;
 import modelos.Comentario;
 import modelos.Producto;
@@ -22,6 +23,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Properties;
 
 
 /**
@@ -32,16 +34,14 @@ public class Control extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	
 	Connection con = null;
-	PreparedStatement sentencia;
-	Statement sentenciaSQL;
-	ArrayList<String> operacionesTexto;
+	Properties consultas;
+	AccesoBD consultasBD;
        
     /**
      * @see HttpServlet#HttpServlet()
      */
     public Control() {
         super();
-        operacionesTexto = new ArrayList<String>();
     }
 
 	/**
@@ -50,7 +50,7 @@ public class Control extends HttpServlet {
 	public void init(ServletConfig config) throws ServletException {
 		try {
 			Class.forName("com.mysql.jdbc.Driver").newInstance();
-			con = DriverManager.getConnection("jdbc:mysql://localhost/tienda", "root", "");
+			con = DriverManager.getConnection("jdbc:mysql://localhost/tienda", "root", "root");
 			if (con!=null)
 			{
 				System.out.println("Conexion OK");
@@ -70,6 +70,19 @@ public class Control extends HttpServlet {
 			
 			e.printStackTrace();
 		}
+		
+		//cargar el properties con las sentencias SQL	
+		consultas = new Properties();
+		try {
+			consultas.load(Thread.currentThread().getContextClassLoader().getResourceAsStream("script.properties"));
+			System.out.println("Cogido el properties");
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.out.println("Problema al cargar el properties");
+		}
+		
+	
+		consultasBD = new AccesoBD(con);
 	}
 
 	/**
@@ -88,8 +101,8 @@ public class Control extends HttpServlet {
 		System.out.println("Oculto: "+ocul);
 		int oculto = Integer.parseInt(ocul);
 		HttpSession sesion = request.getSession();
-		sesion.setAttribute("operaciones", operacionesTexto);
 		ArrayList<Producto> listaProductos = new ArrayList<Producto>();
+		
 		//variables producto
 		String nombre = "", descripcion = "", imgUrl = "";
 		int idProducto = 0, stock = 0;
@@ -101,118 +114,49 @@ public class Control extends HttpServlet {
 		
 		switch (oculto)
 		{
-		// pagina principal, listado de productos
-		case 1: String sql = "select * from productos";
-			try {
-				sentenciaSQL = con.createStatement();
-				ResultSet resultados = sentenciaSQL.executeQuery(sql);
-				while (resultados.next())
-				{
-					nombre = resultados.getString("nombre");
-					descripcion = resultados.getString("descripcion");
-					imgUrl = resultados.getString("imgUrl");
-					idProducto = resultados.getInt("idProducto");
-					stock = resultados.getInt("stock");
-					precio = resultados.getDouble("precio");
 		
-					Producto p = new Producto(idProducto, nombre, descripcion, precio, stock, imgUrl);
-					Carrito carrito = new Carrito();
-					listaProductos.add(p);
-					sesion.setAttribute("carrito", carrito);
-					sesion.setAttribute("listaProductos", listaProductos);
-					
-					// obtener comentarios
-					sentencia = con.prepareStatement("select * from reviews where idProducto = ?");
-					sentencia.setInt(1, idProducto);
-					ResultSet cmnts = sentencia.executeQuery();
-					while (cmnts.next())
-					{
-						idUsuario = cmnts.getInt("idUsuario");
-						comentario = cmnts.getString("comentario");
-						valoracion = cmnts.getInt("valoracion");
-						
-						sentencia = con.prepareStatement("select nombre from usuarios where idUsuario = ?");
-						sentencia.setInt(1, idUsuario);
-						ResultSet nombreRes = sentencia.executeQuery();
-						Comentario comentarioTmp = null;
-						while (nombreRes.next())
-						{
-							comentarioTmp = new Comentario(idProducto, nombreRes.getString("nombre"), comentario, valoracion);
-						}
-						
-						p.addComentario(comentarioTmp);
-					}
-				}
-				operacionesTexto = (ArrayList<String>) sesion.getAttribute("operaciones");
-				operacionesTexto.add("Obtenida la lista de productos de la base de datos");
-				sesion.setAttribute("operaciones", operacionesTexto);
+		// pagina principal, listado de productos
+		case 1: 
+				// extraigo la lista de productos pasando el properties con las sentencias al metodo
+				listaProductos = consultasBD.obtenerProductos(consultas);
+				
+				// añado el carrito y la lista anterior a la sesion
+				Carrito carrito = new Carrito();
+				sesion.setAttribute("carrito", carrito);
+				sesion.setAttribute("listaProductos", listaProductos);
+				
+				// envio al usuario a la pagina principal
 				request.getRequestDispatcher("tienda.jsp").forward(request,response);
 				break;
-			} catch (SQLException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
 			
+				
+				
 		// registro de usuarios (logeo es el 7)
-		case 2: nombre = request.getParameter("nombre");
+		case 2: 
+				// recupera los datos de la request
+				nombre = request.getParameter("nombre");
 				String password = request.getParameter("password");
 				String direccion = request.getParameter("direccion");
 				String poblacion = request.getParameter("poblacion");
 				int cp = Integer.parseInt(request.getParameter("cp"));
 				String pais = request.getParameter("pais");
 				
-			try {
-				sentencia = con.prepareStatement("INSERT INTO usuarios(nombre, password, direccion, poblacion, cp, pais) "
-						+ "VALUES(?, ?, ?, ?, ?, ?)");
-				sentencia.setString(1, nombre);
-				sentencia.setString(2, password);
-				sentencia.setString(3, direccion);
-				sentencia.setString(4, poblacion);
-				sentencia.setInt(5, cp);
-				sentencia.setString(6, pais);
-				sentencia.executeUpdate();
+				// crea el objeto usuario necesario para los metodos posteriores de conexion a la BD
+				Usuario usuario = new Usuario(nombre, password, direccion, poblacion, cp, pais);
 				
-				sentencia = con.prepareStatement("SELECT * from usuarios WHERE nombre = ? AND password = ?");
-				sentencia.setString(1, nombre);
-				sentencia.setString(2, password);
-				ResultSet resultados = sentencia.executeQuery();
-				int id = 0;
-				while(resultados.next())
-				{
-					id = resultados.getInt("idUsuario");
-				}
-				Usuario usuario = new Usuario(id, nombre, password, direccion, poblacion, cp, pais);
+				// registra el usuario, obtiene el idUsuario autoincrementado generado
+				consultasBD.registrarUsuario(consultas, usuario);
+				idUsuario = consultasBD.obtenerIdUsuario(consultas, usuario);
 				
-				// buscamos el id del nuevo usuario que acabamos de insertar
-				sentencia = con.prepareStatement("select * from reviews r, usuarios u where r.idUsuario = u.idUsuario "
-						+ "and u.nombre = ? and u.password = ?");
-				sentencia.setString(1, nombre);
-				sentencia.setString(2, password);
-				ResultSet reviewsDelUsuario = sentencia.executeQuery();
-				while(reviewsDelUsuario.next())
-				{
-					idProducto = reviewsDelUsuario.getInt("idProducto");
-					String comentarioUsuario = reviewsDelUsuario.getString("comentario");
-					valoracion = reviewsDelUsuario.getInt("valoracion");
-					
-					Comentario review = new Comentario(idProducto, nombre, comentarioUsuario, valoracion);
-					usuario.addComentario(review);
-				}
-				
-				sesion.setAttribute("usuario", usuario);
-				operacionesTexto = (ArrayList<String>) sesion.getAttribute("operaciones");
-				operacionesTexto.add("Registro de un usuario");
-				sesion.setAttribute("operaciones", operacionesTexto);
-				request.getRequestDispatcher("perfil.jsp").forward(request,response);
+				// recupera los comentarios de ese usuario
+				// devuelve el mismo objeto con los comentarios incluidos en sus datos
+				usuario = consultasBD.recuperarComentarios(consultas, idUsuario, usuario);
 				
 				break;
-			} catch (SQLException e1) {
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
-			}
 		
 		// carrito
 		case 3: break;
+		
 		
 		// vista individual del producto con sus respectivos comentarios
 		case 4: idProducto = Integer.parseInt(request.getParameter("idP"));
@@ -262,10 +206,6 @@ public class Control extends HttpServlet {
 						}
 						sesion.setAttribute("listaComentarios", listaComentarios);
 					}
-					
-					operacionesTexto = (ArrayList<String>) sesion.getAttribute("operaciones");
-					operacionesTexto.add("Obteniendo vista individual de un producto, listando sus comentarios");
-					sesion.setAttribute("operaciones", operacionesTexto);
 					request.getRequestDispatcher("producto.jsp").forward(request,response);
 					break;
 					
@@ -297,9 +237,6 @@ public class Control extends HttpServlet {
 						sentencia.executeUpdate();
 						sesion.setAttribute("usuario", usuario);
 						
-						operacionesTexto = (ArrayList<String>) sesion.getAttribute("operaciones");
-						operacionesTexto.add("insertando un nuevo comentario en la base de datos");
-						sesion.setAttribute("operaciones", operacionesTexto);
 						request.getRequestDispatcher("producto.jsp?oculto=4&idP=" + idProducto).forward(request, response);
 						break;
 					} catch (SQLException e) {
@@ -340,10 +277,6 @@ public class Control extends HttpServlet {
 							System.out.println(idProducto);
 							sesion.setAttribute("usuario", usuario);
 							
-							
-							operacionesTexto = (ArrayList<String>) sesion.getAttribute("operaciones");
-							operacionesTexto.add("Eliminando un comentario de la base de datos");
-							sesion.setAttribute("operaciones", operacionesTexto);
 							request.getRequestDispatcher("perfil.jsp").forward(request, response);
 							
 							break;
@@ -395,9 +328,6 @@ public class Control extends HttpServlet {
 							
 							sesion.setAttribute("usuario", u);
 
-							operacionesTexto = (ArrayList<String>) sesion.getAttribute("operaciones");
-							operacionesTexto.add("Logueando un usuario");
-							sesion.setAttribute("operaciones", operacionesTexto);
 							request.getRequestDispatcher("index.html").forward(request, response);
 							break;
 							
