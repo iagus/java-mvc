@@ -96,7 +96,8 @@ public class AccesoBD {
 	 */
 	public void registrarUsuario(Properties consultas, Usuario usuario)
 	{
-		// recoge los datos del usuario
+		// recoge los datos del objeto usuario
+		// para incluirlos en la sentencia posterior
 		String nombre = usuario.getNombre();
 		String pais = usuario.getPais();
 		String password = usuario.getPassword();
@@ -104,8 +105,8 @@ public class AccesoBD {
 		String direccion = usuario.getDireccion();
 		int cp = usuario.getCp();
 		
-		// efectua la insercion en la base de datos
 		try {
+			// extrae la consulta del properties, efectua la insercion
 			sentenciaSQL = con.prepareStatement(consultas.getProperty("insertarUsuario"));
 			sentenciaSQL.setString(1, nombre);
 			sentenciaSQL.setString(2, password);
@@ -137,15 +138,19 @@ public class AccesoBD {
 		int id = 0;
 		
 		try {
+			// extrae la consulta del properties, la ejecuta
 			sentenciaSQL = con.prepareStatement(consultas.getProperty("obtenerIdUsuario"));
 			sentenciaSQL.setString(1, nombre);
 			sentenciaSQL.setString(2, password);
 			result = sentenciaSQL.executeQuery();
 			
+			// recupera el idUsuario del conjunto de resultados (deberia ser solo 1)
 			while (result.next())
 			{
 				id = result.getInt("idUsuario");
 			}
+			
+			sentenciaSQL.close();
 			
 		} catch (SQLException e) {
 			// TODO Auto-generated catch block
@@ -156,18 +161,22 @@ public class AccesoBD {
 	
 	
 	/**
-	 * Recupera todos los comentarios del usuario cuyo id es pasado como parametro.
-	 * Utiliza el nombre pasado como parametro para incluirlo en los objetos Comentario.
+	 * Recupera todos los comentarios del usuario cuyo id es pasado como parametro
+	 * y los añade al modelo de datos del objeto Usuario.
 	 * @param consultas
-	 * @param idUsuario, nombre
+	 * @param idUsuario, usuario (sin datos de los comentarios)
 	 * @return lista de comentarios
 	 */
-	public Usuario recuperarComentarios(Properties consultas, int idUsuario, Usuario usuario)
+	public Usuario recuperarComentariosUsuario(Properties consultas, int idUsuario, Usuario usuario)
 	{
 		try {
+			// recoge la consulta del properties, la ejecuta
 			sentenciaSQL = con.prepareStatement(consultas.getProperty("recuperarComentariosUsuario"));
 			sentenciaSQL.setInt(1, idUsuario);
 			result = sentenciaSQL.executeQuery();
+			
+			// recupera las variables del resultado y 
+			// crea un objeto del tipo Comentario con ellas
 			while(result.next())
 			{
 				int idProducto = result.getInt("idProducto");
@@ -175,15 +184,114 @@ public class AccesoBD {
 				int valoracion = result.getInt("valoracion");
 				
 				Comentario review = new Comentario(idProducto, usuario.getNombre(), comentarioUsuario, valoracion);
+				
+				// añade el objeto comentario a los comentarios del objeto Usuario
 				usuario.addComentario(review);
 			}
+			
+			sentenciaSQL.close();
 			
 		} catch (SQLException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
+		// devuelve el objeto con los datos de los comentarios actualizados
 		return usuario;
+	}
+	
+	
+	/**
+	 * Obtiene el producto a traves del idProducto.
+	 * 
+	 * @param consultas
+	 * @param idProducto
+	 * @return objeto Producto (sin los comentarios)
+	 */
+	public Producto obtenerProducto(Properties consultas, int idProducto)
+	{
+		Producto producto = null;
+		try {
+			// ejecuta la sentencia pasando el idProducto como parametro
+			sentenciaSQL = con.prepareStatement(consultas.getProperty("seleccionarProducto"));
+			sentenciaSQL.setInt(1, idProducto);
+			result = sentenciaSQL.executeQuery();
+			String imgUrl = "", nombre = "", descripcion = "";
+			int stock = 0;
+			double precio = 0;
+			
+			while (result.next())
+			{
+				// recoge los datos del producto para crear el objeto
+				imgUrl = result.getString("imgUrl");
+				nombre = result.getString("nombre");
+				stock = result.getInt("stock");
+				precio = result.getDouble("precio");
+				descripcion = result.getString("descripcion");
+			}
+			
+			sentenciaSQL.close();
+			
+			// crea el objeto para devolverlo
+			producto = new Producto(idProducto, nombre, descripcion, precio, stock, imgUrl);
+			
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return producto;
+	}
+	
+	
+	
+	/**
+	 * Añade los comentarios del producto a su modelo de datos y lo devuelve.
+	 * 
+	 * @param consultas
+	 * @param Producto p sin sus respectivos comentarios en sus datos
+	 * @param idProducto
+	 * @return
+	 */
+	public Producto recuperarComentariosProducto(Properties consultas, Producto p, int idProducto) 
+	{
+		try {
+			sentenciaSQL = con.prepareStatement(consultas.getProperty("recuperarComentariosProducto"));
+			sentenciaSQL.setInt(1, idProducto);
+			result = sentenciaSQL.executeQuery();
+			
+			while (result.next())
+			{
+				// extrae las variables necesarias para crear el objeto Comentario
+				int idUsuario = result.getInt("idUsuario");
+				String comentario = result.getString("comentario");
+				int valoracion = result.getInt("valoracion");
+				
+				// busca el nombre del autor del comentario actual
+				sentenciaSQL = con.prepareStatement(consultas.getProperty("buscarAutor"));
+				sentenciaSQL.setInt(1, idUsuario);
+				ResultSet resultado = sentenciaSQL.executeQuery();
+				String nombre = "";
+				
+				// recupera el valor del nombre del resultado de la consulta
+				while (resultado.next())
+				{
+					nombre = resultado.getString("nombre");
+				}
+				
+				// crea el objeto comentario
+				Comentario c = new Comentario(idUsuario, idProducto, comentario, valoracion);
+				
+				// lo añade al objeto producto
+				p.addComentario(c);
+			}
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		// una vez fuera del bucle, devuelve el objeto con los comentarios actualizados
+		return p;
 	}
 
 }

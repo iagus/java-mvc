@@ -150,7 +150,7 @@ public class Control extends HttpServlet {
 				
 				// recupera los comentarios de ese usuario
 				// devuelve el mismo objeto con los comentarios incluidos en sus datos
-				usuario = consultasBD.recuperarComentarios(consultas, idUsuario, usuario);
+				usuario = consultasBD.recuperarComentariosUsuario(consultas, idUsuario, usuario);
 				
 				break;
 		
@@ -159,63 +159,29 @@ public class Control extends HttpServlet {
 		
 		
 		// vista individual del producto con sus respectivos comentarios
-		case 4: idProducto = Integer.parseInt(request.getParameter("idP"));
-				sql = "select * from productos where idProducto = ?";
-				ArrayList<Comentario> listaComentarios = new ArrayList<Comentario>();
-				try {
-					sentencia = con.prepareStatement(sql);
-					sentencia.setInt(1, idProducto);
-					ResultSet resultados = sentencia.executeQuery();
-					
-					//obtener los productos
-					while (resultados.next())
-					{
-						nombre = resultados.getString("nombre");
-						descripcion = resultados.getString("descripcion");
-						imgUrl = resultados.getString("imgUrl");
-						idProducto = resultados.getInt("idProducto");
-						stock = resultados.getInt("stock");
-						precio = resultados.getDouble("precio");
-			
-						Producto p = new Producto(idProducto, nombre, descripcion, precio, stock, imgUrl);
-						sesion.setAttribute("producto", p);
-						
-						
-						//obtener los comentarios
-						sentencia = con.prepareStatement("select * from reviews where idProducto = ?");
-						sentencia.setInt(1, idProducto);
-						ResultSet comentarios = sentencia.executeQuery();
-						while (comentarios.next())
-						{
-							
-							comentario = comentarios.getString("comentario");
-							valoracion = comentarios.getInt("valoracion");
-							idUsuario = comentarios.getInt("idUsuario");
-							
-							sentencia = con.prepareStatement("select nombre from usuarios where idUsuario = ?");
-							sentencia.setInt(1, idUsuario);
-							ResultSet usuarioRes = sentencia.executeQuery();
-							String nombreUser = "";
-							while (usuarioRes.next())
-							{
-								nombreUser = usuarioRes.getString("nombre");
-							}
-							
-							Comentario objetoComentario = new Comentario(idProducto, nombreUser, comentario, valoracion);
-							listaComentarios.add(objetoComentario);
-						}
-						sesion.setAttribute("listaComentarios", listaComentarios);
-					}
-					request.getRequestDispatcher("producto.jsp").forward(request,response);
-					break;
-					
-				} catch (SQLException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
+		case 4: 
+				// recupera el idProducto de la request
+				idProducto = Integer.parseInt(request.getParameter("idP"));
 				
-				//insertar nuevo comentario
-				case 5:
+				// extrae el objeto Producto de la base de datos
+				// pero SIN los comentarios correspondientes a este producto
+				Producto p = consultasBD.obtenerProducto(consultas, idProducto);
+				
+				// sobreescribe la variable p anterior CON los comentarios 
+				// correspondientes al producto
+				p = consultasBD.recuperarComentariosProducto(consultas, p, idProducto);
+				
+				// añade el objeto p a la sesion para acceder a el desde la vista
+				sesion.setAttribute("producto", p);
+				
+				//redirige al usuario a la vista
+				request.getRequestDispatcher("producto.jsp").forward(request,response);
+				
+				break;
+	
+				
+		//insertar nuevo comentario
+		case 5:
 					Usuario usuario = (Usuario) sesion.getAttribute("usuario");
 					String texto = request.getParameter("comentario");
 					valoracion = Integer.parseInt(request.getParameter("valoracion"));
