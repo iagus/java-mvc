@@ -50,11 +50,22 @@ public class Control extends HttpServlet {
 	public void init(ServletConfig config) throws ServletException {
 		try {
 			Class.forName("com.mysql.jdbc.Driver").newInstance();
-			con = DriverManager.getConnection("jdbc:mysql://localhost/tienda", "root", "root");
+			con = DriverManager.getConnection("jdbc:mysql://localhost/tienda", "root", "");
 			if (con!=null)
 			{
 				System.out.println("Conexion OK");
+				consultasBD = new AccesoBD(con);
 			}
+			consultas = new Properties();
+			try {
+				consultas.load(Thread.currentThread().getContextClassLoader().getResourceAsStream("consultas.properties"));
+				System.out.println("Cogido el properties");
+				
+			} catch (IOException e) {
+				e.printStackTrace();
+				System.out.println("Problema al cargar el properties");
+			}
+			
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
 			System.out.println("Error al cargar e driver");
@@ -72,17 +83,7 @@ public class Control extends HttpServlet {
 		}
 		
 		//cargar el properties con las sentencias SQL	
-		consultas = new Properties();
-		try {
-			consultas.load(Thread.currentThread().getContextClassLoader().getResourceAsStream("script.properties"));
-			System.out.println("Cogido el properties");
-		} catch (IOException e) {
-			e.printStackTrace();
-			System.out.println("Problema al cargar el properties");
-		}
 		
-	
-		consultasBD = new AccesoBD(con);
 	}
 
 	/**
