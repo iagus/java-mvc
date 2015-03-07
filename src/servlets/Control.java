@@ -195,96 +195,38 @@ public class Control extends HttpServlet {
 				consultasBD.insertarComentario(consultas, usuario, idProducto, valoracion, texto);
 				break; 
 					
-	//eliminar comentario
+		//eliminar comentario
 		case 6:
-					idUsuario = Integer.parseInt(request.getParameter("usuario"));
-					idProducto = Integer.parseInt(request.getParameter("producto"));
-					usuario = (Usuario) sesion.getAttribute("usuario");
-					
-					try {
-						sentencia = con.prepareStatement("SELECT * from reviews WHERE idProducto = ? AND idUsuario = ?");
-						sentencia.setInt(1, idUsuario);
-						sentencia.setInt(2, idProducto);
-						
-						ResultSet comentariosParaEliminar = sentencia.executeQuery();
-						
-						while (comentariosParaEliminar.next())
-						{
-							idUsuario = comentariosParaEliminar.getInt("idUsuario");
-							idProducto = comentariosParaEliminar.getInt("idProducto");
-							comentario = comentariosParaEliminar.getString("comentario");
-							valoracion = comentariosParaEliminar.getInt("valoracion");
-								
-							Comentario comEliminar = new Comentario(idProducto, idUsuario, comentario, valoracion);
-							usuario.eliminarComentario(idProducto, idUsuario);
-						}
-							
-						sentencia = con.prepareStatement("DELETE from reviews WHERE idProducto = ? AND idUsuario = ?");
-						sentencia.setInt(1, idProducto);
-						sentencia.setInt(2, idUsuario);
-						sentencia.executeUpdate();
-						System.out.println(idUsuario);
-						System.out.println(idProducto);
-						sesion.setAttribute("usuario", usuario);
-							
-						request.getRequestDispatcher("perfil.jsp").forward(request, response);
-							
-						break;
-						} catch (SQLException e1) {
-							// TODO Auto-generated catch block
-							e1.printStackTrace();
-						}
+				idUsuario = Integer.parseInt(request.getParameter("usuario"));
+				idProducto = Integer.parseInt(request.getParameter("producto"));
 				
-				//loguear user
-				case 7: 
-						nombre = request.getParameter("nombre");
-						String pass = request.getParameter("password");
-						try {
-							sentencia = con.prepareStatement("SELECT * from usuarios WHERE nombre = ? AND password = ?");
-							sentencia.setString(1, nombre);
-							sentencia.setString(2, pass);
-							Usuario u = new Usuario();
-							ResultSet usuarioBD = sentencia.executeQuery();
-							while(usuarioBD.next())
-							{
-								idUsuario = usuarioBD.getInt("idUsuario");
-								nombre = usuarioBD.getString("nombre");
-								password = usuarioBD.getString("password");
-								direccion = usuarioBD.getString("direccion");
-								poblacion = usuarioBD.getString("poblacion");
-								cp = usuarioBD.getInt("cp");
-								pais = usuarioBD.getString("pais");
-								
-								u = new Usuario(idUsuario, nombre, password, direccion, poblacion, cp, pais);
-							}
+				//extrae el usuario de la sesion para modificar sus datos
+				usuario = (Usuario) sesion.getAttribute("usuario");
+					
+				// borra el comentario de la BD y del modelo, devuelve este ultimo
+				usuario = consultasBD.eliminarComentario(consultas, idProducto, usuario);
+					
+				// devuelve el modelo a la sesion y redirige al perfil
+				sesion.setAttribute("usuario", usuario);
+				request.getRequestDispatcher("perfil.jsp").forward(request, response);
 							
-							// recogemos los comentarios de este usuario
-							sentencia = con.prepareStatement("SELECT * from reviews WHERE idUsuario = ?");
-							sentencia.setInt(1, idUsuario);
-							ResultSet comentarios = sentencia.executeQuery();
-							while(comentarios.next())
-							{
-								idUsuario = comentarios.getInt("idUsuario");
-								idProducto = comentarios.getInt("idProducto");
-								texto = comentarios.getString("comentario");
-								valoracion = comentarios.getInt("valoracion");
-								
-								Comentario com = new Comentario(idProducto, idUsuario, texto, valoracion);
-								
-								u.addComentario(com);
-							}
-							
-							
-							sesion.setAttribute("usuario", u);
-
-							request.getRequestDispatcher("index.html").forward(request, response);
-							break;
-							
-						} catch (SQLException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-						
+				break;
+				
+			
+		//loguear user
+		case 7: 
+				// extrae los valores de la request
+				nombre = request.getParameter("nombre");
+				String pass = request.getParameter("password");
+				
+				// extrae todos los datos del usuario
+				usuario = consultasBD.loguearUsuario(consultas, nombre, pass);
+				
+				// incluye el usuario en las variables de sesion
+				sesion.setAttribute("usuario", usuario);
+				
+				//redirige a la pagina principal
+				request.getRequestDispatcher("index.html").forward(request, response);				
 		}
 	}
 }

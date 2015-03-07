@@ -338,9 +338,84 @@ public class AccesoBD {
 	}
 	
 	
-	public void eliminarComentario(Properties consultas, int idUsuario, int idProducto)
+	
+	/**
+	 * Elimina el comentario con el idProducto y el idUsuario correspondiente.
+	 * @param consultas
+	 * @param idProducto
+	 * @param usuario
+	 * @return objeto usuario con los datos actualizados
+	 */
+	public Usuario eliminarComentario(Properties consultas, int idProducto, Usuario usuario)
 	{
+		try {
+			// borra el comentario de la BD
+			sentenciaSQL = con.prepareStatement(consultas.getProperty("borrarComentario"));
+			sentenciaSQL.setInt(1, idProducto);
+			sentenciaSQL.setInt(2, usuario.getIdUsuario());
+			sentenciaSQL.executeUpdate();
+			
+			// borra el comentario del modelo
+			usuario.eliminarComentario(idProducto, usuario.getIdUsuario());
+			
+			sentenciaSQL.close();
+			
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		
+		// devuelve el modelo sin ese comentario
+		return usuario;
+	}
+	
+	
+	
+	/**
+	 * Recibe el nombre de usuario y password, comprueba que existan en la BD
+	 * y si existe, devuelve un objeto Usuario para ser incluido en la sesion.
+	 * @param consultas
+	 * @param nombre
+	 * @param password
+	 * @return
+	 */
+	public Usuario loguearUsuario(Properties consultas, String nombre, String password)
+	{
+		// inicializa variables
+		Usuario usuario = null;
+		int idUsuario = 0, cp = 0;
+		String direccion = "", pais = "", poblacion = "";
+		
+		try {
+			
+			// ejecuta la sentencia que selecciona el usuario
+			sentenciaSQL = con.prepareStatement(consultas.getProperty("seleccionarUsuario"));
+			sentenciaSQL.setString(1, nombre);
+			sentenciaSQL.setString(2, password);
+			result = sentenciaSQL.executeQuery();
+			
+			// extrae los datos correspondientes
+			while (result.next())
+			{
+				idUsuario = result.getInt("idUsuario");
+				direccion = result.getString("direccion");
+				pais = result.getString("pais");
+				poblacion = result.getString("poblacion");
+				cp = result.getInt("cp");
+			}
+			
+			// crea el objeto y recupera los comentarios que haya hecho el usuario
+			// para agregarlos al modelo
+			usuario = new Usuario(idUsuario, nombre, password, direccion, poblacion, cp, pais);
+			usuario = recuperarComentariosUsuario(consultas, idUsuario, usuario);
+			
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		// devuelve el usuario
+		return usuario;
 	}
 
 }
